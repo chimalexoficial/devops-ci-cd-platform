@@ -24,8 +24,9 @@
       yum:
         name: maven
         state: present
-        
-    - name: Set Docker socket permissions
-      file:
-        path: /var/run/docker.sock
-        mode: '0777'
+
+    - name: Add user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
