@@ -1,0 +1,35 @@
+pipeline {
+    agent any
+    stages {
+        stage('--- git version ---') {
+            steps {
+                sh 'git version'
+            }
+        }
+        
+        stage('--- docker version ---') {
+            steps {
+                sh 'docker version'
+            }
+        }
+        
+        stage('--- ansible version ---') {
+            steps {
+                sh 'ansible --version'
+            }
+        }
+        
+        stage('--- terraform version---') {
+            steps {
+                sh 'terraform version'
+            }
+        }
+        
+        stage('--- eksctl/kubectl version ---') {
+            steps {
+                sh 'eksctl version'
+                sh 'kubectl version --client'
+            }
+        }
+    }
+}

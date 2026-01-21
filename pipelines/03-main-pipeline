@@ -1,0 +1,116 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCOUNT_ID = '529928147146'
+        AWS_REGION     = 'us-west-1'
+        ECR_REPO       = 'super-project'
+        IMAGE_TAG      = "${BUILD_NUMBER}"
+        EKS_CLUSTER    = 'super-project'
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5', daysToKeepStr: '30'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    tools {
+        maven 'Maven'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/chimalexoficial/devops-ci-cd-platform.git'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube-server') {
+                    sh """
+                    mvn clean verify \
+                    org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar \
+                    -Dsonar.projectKey=superproject \
+                    -Dsonar.projectName=superproject
+                    """
+                }
+            }
+        }
+
+        stage('Maven Build') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh """
+                docker build -t \
+                ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG} .
+                """
+            }
+        }
+
+        stage('Docker Login & Push to ECR') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-key'
+                ]]) {
+                    sh """
+                    aws ecr get-login-password --region ${AWS_REGION} \
+                    | docker login --username AWS --password-stdin \
+                    ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+                    docker push \
+                    ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}
+
+                    docker tag \
+                    ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG} \
+                    ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+
+                    docker push \
+                    ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest
+                    """
+                }
+            }
+        }
+        
+        stage('k8s deployment') {
+        steps {
+            withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-key'
+            ]]) {
+            sh """
+            aws eks update-kubeconfig \
+            --region ${AWS_REGION} \
+            --name ${EKS_CLUSTER}
+            """
+
+            sh """
+            kubectl apply -f Application.yaml
+            """
+            }
+        }
+    }
+}
+
+    
+    post {
+        always {
+            echo "job completed :)"
+        }
+        success {
+            echo "success! yay!"
+        }
+        failure {
+            echo "failed :("
+        }
+    }
+}
+

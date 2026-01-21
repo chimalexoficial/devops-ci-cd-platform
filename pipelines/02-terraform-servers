@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('checkout stage') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: 'https://github.com/chimalexoficial/devops-ci-cd-platform.git']]
+                )
+            }
+        }
+
+        stage('terraform init') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-key'
+                ]]) {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('terraform plan') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-key'
+                ]]) {
+                    sh 'terraform plan'
+                }
+            }
+        }
+
+        stage('terraform apply') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-key'
+                ]]) {
+                    sh 'terraform apply -auto-approve'
+                }
+            }
+        }
+    }
+}
+

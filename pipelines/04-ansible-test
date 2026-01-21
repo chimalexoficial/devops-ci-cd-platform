@@ -1,0 +1,28 @@
+pipeline {
+    agent any
+
+    environment {
+        PRIVATE_KEY = credentials('ansible-key')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/chimalexoficial/devops-ci-cd-platform.git'
+                    ]]
+                )
+            }
+        }
+
+        stage('Ansible Test') {
+            steps {
+                sh 'ansible all -i inventory -m ping --private-key ${PRIVATE_KEY}'
+                sh 'ansible-playbook -i inventory --private-key ${PRIVATE_KEY} playbook.yaml'
+            }
+        }
+    }
+}
+
